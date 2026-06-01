@@ -1,6 +1,7 @@
 from langgraph.graph import StateGraph,START, END
 from src.chatbot.state.state import State
 from src.chatbot.Nodes.basic_chatbot_node import BasicChatbotNode
+from langgraph.checkpoint.memory import InMemorySaver
 
 class Graph:
     def __init__(self,model):
@@ -11,13 +12,15 @@ class Graph:
         """
         This function defines a basic chatbot graph
         using the StateGraph class."""
-        
+        print("GRAPH CREATED")
+
         chatbot_node = BasicChatbotNode(self.llm).process
         self.graph.add_node("chatbot", chatbot_node)
         self.graph.add_edge(START, "chatbot")
         self.graph.add_edge("chatbot", END)
         
-        return self.graph.compile()
+        checkpointer = InMemorySaver()
+        return self.graph.compile(checkpointer=checkpointer)
     
     def setup_graph(self,usecase):
         """
