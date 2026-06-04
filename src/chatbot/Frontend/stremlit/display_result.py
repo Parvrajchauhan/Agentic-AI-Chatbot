@@ -1,5 +1,10 @@
 import streamlit as st
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import (
+    HumanMessage,
+    AIMessage,
+    ToolMessage,
+    BaseMessage,
+)
 from langchain_core.runnables import RunnableConfig
 
 
@@ -9,27 +14,52 @@ class DisplayResult:
         self.graph = graph
         self.user_message = user_message
 
-    def display(self):
-        if self.usecase == "Basic Chatbot":
-            config: RunnableConfig = {
-                "configurable": {"thread_id": "1"}
-            }
+    def _render_message(self, msg: BaseMessage):
 
+        if isinstance(msg, HumanMessage):
             with st.chat_message("user"):
-                st.write(self.user_message)
+                st.write(msg.content)
 
-            for event in self.graph.stream(
-                {"messages": ("user", self.user_message)},
-                config
-            ):
-                for value in event.values():
+        elif isinstance(msg, AIMessage):
+            if msg.content:
+                with st.chat_message("assistant"):
+                    st.write(msg.content)
 
-                    msg = value.get("messages")
+        elif isinstance(msg, ToolMessage):
+            with st.chat_message("assistant"):
+                st.caption(f"🔧 Tool: {msg.name}")
+                st.write(msg.content)
 
-                    if isinstance(msg, AIMessage):
-                        with st.chat_message("assistant"):
-                            st.write(msg.content)
-            state = self.graph.get_state(config)
+    def _run_and_collect(self, config: RunnableConfig):
 
-            print("CURRENT STATE:")
-            print(state.values)
+        initial_state = {
+            "messages": [
+                HumanMessage(content=self.user_message)
+            ]
+        }
+
+        for event in self.graph.stream(
+            initial_state,
+            config=config
+        ):
+            print("EVENT:", event)
+
+        state = self.graph.get_state(config)
+
+        print("\nCURRENT STATE:")
+        print(state.values)
+
+        return state.values.get("messages", [])
+
+    def display(self):
+
+        config: RunnableConfig = {
+            "configurable": {
+                "thread_id": "1"
+            }
+        }
+
+        messages = self._run_and_collect(config)
+
+        for msg in messages:
+            self._render_message(msg)
